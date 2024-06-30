@@ -4,8 +4,10 @@ const s = Subsector.generate()
 let worlds = 0
 s.forEach((hex) => { 
   worlds++
-  const st = Subsector.stringify(hex)
+  const st = hex.specs
   console.log(st)
-  if (st.length > 13) console.dir(hex)
 })
-console.log(`${worlds} worlds`)
+console.log(`${worlds} worlds\n\n`)
+for (let i=0; i<10; i++) {
+  console.log(Subsector.details(s[i]))
+}

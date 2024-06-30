@@ -1,0 +1,12 @@
+[
+  { 
+    "type": "world",
+    "rule": ["A,B", "A,C", "A,C,B", "A,C,D,B"],
+    "blocks": [
+      "A:Al,Am,An,Ar,Bal,Del,Fan,Mon,Mor,Nor,Tal,Val,Yu,Xi,Xa,Von",
+      "B:dor,dar,den,bol,fal,fen,fur,gen,ger,gel,gar,gol,gor,ian,jin,jen,kel,lon,lan,lor,lar,mel,mor,mos,mar,min,tan,tar,tor,tal,thur,zak,zin",
+      "C:ben,ba,za,da,di,mi,ni,na,min,mil,jen,jan,jin",
+      "D:a,e,i,o,u"
+    ]
+  }
+]
