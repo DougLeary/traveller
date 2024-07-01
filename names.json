@@ -1,11 +1,11 @@
 [
   { 
     "type": "world",
-    "rule": ["A,B", "A,C", "A,C,B", "A,C,D,B"],
+    "rule": ["A,BC", "A,CD-,B"],
     "blocks": [
-      "A:Al,Am,An,Ar,Bal,Del,Fan,Mon,Mor,Nor,Tal,Val,Yu,Xi,Xa,Von",
-      "B:dor,dar,den,bol,fal,fen,fur,gen,ger,gel,gar,gol,gor,ian,jin,jen,kel,lon,lan,lor,lar,mel,mor,mos,mar,min,tan,tar,tor,tal,thur,zak,zin",
-      "C:ben,ba,za,da,di,mi,ni,na,min,mil,jen,jan,jin",
+      "A:Al,Am,An,Ar,Ax,Bel,Del,El,Em,Ex,Fan,Ju,Ka,Ki,Mon,Mor,Nor,Or,On,Pan,Pel,Per,Tal,Ur,Val,Von,Wal,Ya,Yu",
+      "B:dor,dar,den,bol,fal,fen,fur,gen,ger,gel,gar,gol,gor,ian,jin,jen,kel,lon,lan,lor,lar,mel,mor,mos,mar,tal,tan,tar,ton,tor,thur,tur,zak,zin",
+      "C:ben,ba,z,da,di,mi,ni,na,min,mil,wen,jan,vin",
       "D:a,e,i,o,u"
     ]
   }

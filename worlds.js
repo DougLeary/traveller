@@ -16,12 +16,19 @@ const starportFeatures = {
 }
 const starportTypes = {
   // for nb# and sb# the # is the 2d6 roll required for the base to be present 
-  A: "Excellent:rf,am,ss,nb8,sb10",
-  B: "Good:rf,am,sn,nb8,sb9",
-  C: "Routine:uf,rr,sb8",
-  D: "Poor:uf,sb7",
+  A: "Excellent:rf,am,ss;nb?8,sb?10",
+  B: "Good:rf,am,sn;nb?8,sb?9",
+  C: "Routine:uf,rr;sb?8",
+  D: "Poor:uf;sb?7",
   E: "Frontier:ls",
   X: "No:"
+}
+
+const scoutBaseRoll = {
+  A: 10,
+  B: 9,
+  C: 8,
+  D: 7
 }
 
 const atmosphereTypes = [
@@ -58,7 +65,7 @@ const governmentTypes = [
 ]
 
 const lawLevelTypes = [
-  "No laws affecting weapons possesson or ownership",
+  "No laws affecting weapons possession or ownership",
   "Certain weapons are prohibited, including specifically 1) body pistols that are undetectable by standard detectors, 2) explosive weapons such as bombs or grenade, and 3) poison gas.",
   "Portable energy weapons such as laser rifles or carbines are prohibited. Ships gunnery is not affected.",
   "Weapons of a strict military nature (such as machine guns or automatic rifles, though not submachine guns) are prohibited.",
@@ -79,28 +86,24 @@ const techMatrix = {
   gov: {0:1, 5:1, D:-2}
 }
 
-function roll(n=1, d=6, dm=0) {
-  // return the total of n rolls of a die d with modifier dm
+function roll(n=2, d=6) {
+  // simple die roller; returns the total of n rolls of a die d, default 2d6
   let total = 0
   for (let i=0; i<n; i++) {
     total += Math.floor(Math.random() * d) + 1
   }
-  return total + dm
+  return total
 }
 
 function planetSize(value) {
   return (value == 0) ? "Asteroid/Planetoid Complex" : `${value}000 miles diameter`
 }
 
-function atmosphere(value) {
-  return atmosphereTypes[value]  
-}
-
 function hydro(value) {
   return (value == '0') ? "No free standing water" : `${value}0% water`
 }
 
-function getExactPopulation(value) {
+function exactPopulation(value) {
   if (value == 0) return 0
 
   // generate a population between 10^value and one power lower
@@ -108,25 +111,14 @@ function getExactPopulation(value) {
   return pop.toLocaleString()
 }
 
-function government(value) {
-  return governmentTypes[value]
-}
-
 function lawLevel(value) {
   return lawLevelTypes[value]
-}
-
-function facilities(value) {
-  const [port, feat] = starportTypes[value].split(":")
-  const features = feat.split(",")
-  const items = []
-  features.map((feat) => { items.push(`  ${starportFeatures[feat]}`)})
-  return `${port} starport. ${feat}\n${items.join('\n')}`
 }
 
 function hexOf(value) {
   return value.toString(16).toUpperCase()
 }
+
 function stringify(world) {
   const loc = `${String(world.x).padStart(2,'0')}${String(world.y).padStart(2,'0')}`
   const st = `${loc}  ${world.starportType}${hexOf(world.size)}${hexOf(world.atmosphere)}${hexOf(world.hydroPercent)}` 
@@ -134,12 +126,28 @@ function stringify(world) {
   return st
 }
 
+function getFacilities(value) {
+  // for value "A" starportTypes["A"]: "Excellent:rf,am,ss;nb?8,sb?10"
+  // here we parse the string to get the services and roll for the starbases
+  const [port, specs] = starportTypes[value].split(":")
+  const specParts = specs.split(";")
+  const services = specParts[0].split(",") || []
+  const items = []
+  services.map((item) => { 
+    items.push(`  ${starportFeatures[item]}`)
+  })
+  return [port, items]
+}
+
 function details(world) {
+  const [port, fac] = getFacilities(world.starportType)
   const st = `${stringify(world)}\n${planetSize(world.size)}, ${hydro(world.hydroPercent)}`
-    + `\n${atmosphere(world.atmosphere)} atmosphere`
-    + `\n${facilities(world.starportType)}`
+    + `\n${atmosphereTypes[world.atmosphere]} atmosphere`
     + `\nPopulation ${world.population}`
-    + `\nGoverned by ${government(world.government)}\nTech Level: ${world.techLevel}\n${lawLevel(world.lawLevel)}\n`
+    + `\n${port} starport:\n${fac.join('\n')}`
+    + (world.navalBase ? `\n  ${starportFeatures.nb}` : "")
+    + (world.scoutBase ? `\n  ${starportFeatures.sb}${!fac.includes('rf') ? ", refined fuel available for scout ships" : ""}` : "")
+    + `\nGoverned by ${governmentTypes[world.government]}\nTech Level: ${world.techLevel}\n${lawLevel(world.lawLevel)}\n`
   return st
 }
 
@@ -150,39 +158,67 @@ function getTechLevel(world) {
     + techMatrix.hydro[world.hydroPercent] || 0
     + techMatrix.pop[world.population] || 0
     + techMatrix.gov[world.government] || 0
-  return Math.max(0, roll(1, 6, dm))
+  return Math.max(0, roll(1) + dm)
 }
 
-function generateHex(x, y, dm=0) {
+function getBase(bases, baseType) {
+  for (let i=0; i< bases.length; i++) {
+    if (bases[i].startsWith(baseType)) {
+      return (roll() >= bases[i].split('?')[1]) 
+    }
+  }
+  return false    
+}
+
+function newWorldName(subsector) {
+  // generate a world name not already used in this subsector 
+  let name = Names.getName('world')
+  let unique = true
+  for (world in subsector) {
+    if (world.name == name) {
+      unique = false
+      break
+    }
+  }
+  return unique ? name : newWorldName(subsector)
+}
+
+function newHex(subsector, x, y, dm=0) {
   // roll for worlds in hex x,y with die modifier dm 
-  if (roll(1,6,dm) < 4) return null
+  if (roll(1) + dm < 4) return null
   // world is present
 
   const world = {
     x: x,
     y: y,
-    name: Names.getName('world'),
-    starportType: starports.charAt(roll(2)-2),
-    size: roll(2,6,-2),
-    popLevel: roll(2,6,-2)
+    name: newWorldName(subsector),
+    starportType: starports.charAt(roll()-2),
+    size: roll()-2,
+    popLevel: roll()-2
   }
-  world.atmosphere = (world.size == 0) ? 0 : roll(2, 6, Math.max(0,world.size-7))
-  world.hydroPercent = (world.size <= 1) ? 0 : roll(2, 6, Math.min(10,Math.max(0,world.size-7)))
-  world.population = getExactPopulation(world.popLevel)
-  world.government = Math.max(0, roll(2, 6, world.popLevel-7))
-  world.lawLevel = Math.min(Math.max(0, roll(2, 6, world.government-7)), 9)
+//  world.navalBase = ('AB'.includes(world.starportType) && roll() >= 8) ? true : false
+//  world.scoutBase = ('ABCD'.includes(world.starportType) && roll() >= 10 - 'ABCD'.indexOf(world.starportType)) ? true : false
+  world.atmosphere = (world.size == 0) ? 0 : roll() + Math.max(0,world.size-7)
+  world.hydroPercent = (world.size <= 1) ? 0 : roll() + Math.min(10,Math.max(0,world.size-7))
+  world.population = exactPopulation(world.popLevel)
+  world.government = Math.max(0, roll() + world.popLevel-7)
+  world.lawLevel = Math.min(Math.max(0, roll() + world.government-7), 9)
   world.techLevel = getTechLevel(world)
   world.specs = stringify(world)
+  const bases = starportTypes[world.starportType].split(":")[1]?.split(";")[1]?.split(",") || []
+  world.navalBase = getBase(bases, 'nb')
+  world.scoutBase = getBase(bases, 'sb')
+
   return world
 }
 
-function generate(dm=0) {
+function newSubsector(dm=0) {
   // generate hexes using die modifier dm
   const arr = []
   let count = 0
   for (let x=1; x < 9; x++) {
     for (let y=1; y < 11; y++) {
-      const hex = generateHex(x, y, dm)
+      const hex = newHex(arr, x, y, dm)
       if (hex) {
         count++
         arr.push(hex)
@@ -193,4 +229,4 @@ function generate(dm=0) {
 }
 
 
-module.exports = { generate, stringify, details, roll }
+module.exports = { newSubsector, newHex, stringify, details, roll }
