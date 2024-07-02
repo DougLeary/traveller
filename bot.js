@@ -6,8 +6,6 @@ const context = {
   subsector: Worlds.newSubsector()      // TODO: load from data
 }
 
-const loginToken = secret.botToken 
-
 const commandPrefix = '!tr' 
 
 const { Client, GatewayIntentBits } = require('discord.js')
@@ -106,4 +104,4 @@ client.on('messageCreate', message => {
   }
 })
 
-client.login(loginToken)    // login to discord
+client.login(secret.loginToken)    // login to discord
