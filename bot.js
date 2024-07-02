@@ -1,11 +1,14 @@
 // Discord Bot TravvyMcTraveller
-const worlds = require('./worlds')
+const secret = require('./secret')
+const Worlds = require('./worlds')
 
 const context = {
-  subsector: worlds.newSubsector()      // TODO: load from data
+  subsector: Worlds.newSubsector()      // TODO: load from data
 }
 
-const loginToken = "MTI1NzIzOTU1NDM5ODc0ODgwMg.GdOBP4.qklAod-Ai7nv8AUI4JfEMUGCF6jkZEkWgngJJo" 
+const loginToken = secret.botToken 
+
+const commandPrefix = '!tr' 
 
 const { Client, GatewayIntentBits } = require('discord.js')
 const fetchAll = require('discord-fetch-all')
@@ -22,29 +25,40 @@ const client = new Client({
 
 client.once('ready', () => {
   // executes once on startup; do setup stuff
-  console.log('TravvyMcTraveller bot connected to Discord')
+  console.log('TravvyMcTraveller connected to Discord')
 })
 
-function getParams(msg, command) {
-  return msg.substring(command.length+1)
+function getParams(cmd, msg) {
+  return msg.content.substring(cmd.length + commandPrefix.length + 1).trim()
 }
 
-function initSubsector(message) {
-  // generate a subsector
-  const msg = ''
-
-  message.channel.send(msg)
-}
-
-function doBeta(message) {
-  // demo
-  const msg = `command: "beta", params: "${getParams(message.content, 'beta')}"`
+function doCommand(cmd, message) {
+  // example command handler;
+  // cmd = command word, message = entire discord message containing the command;
+  // to get parameters get the rest of message.content after prefix+cmd
+  const params = getParams(cmd, message)
+  const msg = `cmd: ${cmd}, params: ${params}`
   console.log(msg)
   message.channel.send(msg)
 }
 
-function clearTest(message) {
-  // useful tool for bot testing;
+function infoFromCode(cmd, message) {
+  // command should be followed by a standard condensed world code, example: B4897A9 5 N
+  // spaces are not necessary and are ignored
+  const param = getParams(cmd, message)
+  const msg = Worlds.worldDetailsFromCode(param)
+  console.log(msg)
+  message.channel.send(msg)
+}
+
+function newSubsector(cmd, message) {
+  // generate a subsector
+  const msg = 'generating subsector'
+  message.channel.send(msg)
+}
+
+function clearChannel(cmd, message) {
+  // useful tool for bot testing; 
   // for safety it only works if the channel name is "testing"
   if (message.channel.name != "testing") return
   
@@ -70,10 +84,11 @@ function clearTest(message) {
   );
 }
 
-const commandPrefix = '!' 
 const commands = [
-  {command: "init", handler: initSubsector},
-  {command: "cleartest", handler: clearTest}
+  {command: "test", handler: doCommand},
+  {command: "generate", handler: newSubsector},
+  {command: "code", handler: infoFromCode},
+  {command: "clear", handler: clearChannel}
 ]
 
 client.on('messageCreate', message => {
@@ -81,14 +96,11 @@ client.on('messageCreate', message => {
   // console.log(`${client.user} says: ${message}`)
   if (!message.content.startsWith(commandPrefix)) return
 
-  const msg = message.content.substring(1)
-  const tokens = msg.split(' ')
-  if (tokens.length == 0) return   // command missing 
-
-  const cmd = tokens[0].toLowerCase()
-  for (const item of commands) {
-    if (item.command == cmd) {
-      item.handler(message)
+  const msg = message.content.substring(commandPrefix.length).trim()
+  for (const cmd of commands) {
+    if (msg.startsWith(`${cmd.command} `)) {
+      message.channel.send(`Command: ${cmd.command}`)
+      cmd.handler(cmd.command, message)
       break
     }
   }
