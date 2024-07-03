@@ -238,9 +238,9 @@ function newHex(subsector, x, y, dm=0) {
   const atmo = (size == 0) ? 0 : Math.max(0, roll() - 7 + size)
   const hydro = (size < 2) ? 0 : Math.max(0, roll() - 7 + size - ((atmo < 2 || atmo > 9) ? 4 : 0))
   const pop = roll() - 2
-  const gov = Math.max(0, roll() - 7 + pop)
+  const gov = (pop == 0) ? 0 : Math.max(0, roll() - 7 + pop)
   const law = Math.min(9, Math.max(0, roll() - 7 + gov))
-  const tech = Math.max(0, roll(1) 
+  const tech = (pop == 0) ? 0 : Math.max(0, roll(1) 
     + techMatrix.port[port] || 0
     + techMatrix.size[size] || 0
     + techMatrix.atmo[atmo] || 0
