@@ -1,8 +1,29 @@
+// Traveller world utilities
+//
+// world summary example:  0203 B669568 8 2  Anozak
+//  format:  loc  code  tech  bases  name
+// 
+//  loc: xy grid (1-8,1-10)
+//
+//  code (7 hex digits):
+//    starport type  A-E   (best to worst) or X (none)
+//    planet size    0-C   (thousands of miles)
+//    atmosphere     0-C   (enumerated)
+//    hydrographic   0-A   (tens digit of percent coverage)
+//    population     0-A   (power of 10) actual is between this and one power lower
+//    government     0-D   (enumerated)
+//    law level      0-9   (enumerated)
+//
+//  tech level:      1-18  (enumerated)
+//
+//  bases:           N (Naval), S (Scout), 2 (both), blank (none)
+
 const Names = require('../DMTools/names.js')
 const namesPath = __dirname + '/names.json'
 Names.load(namesPath)
 
-const starports = 'AAABBCCDEEX'   // for roll results 2..12
+const starports = 'AAABBCCDEEX'   // for roll results 2..12; TODO: allow custom strings
+
 const starportFeatures = { 
   rf: "Refined fuel",
   uf: "Unrefined fuel",
@@ -25,6 +46,7 @@ const starportTypes = {
 }
 
 const scoutBaseRoll = {
+  // 2d6 roll needed for a scout base, depending on starport type
   A: 10,
   B: 9,
   C: 8,
@@ -124,10 +146,11 @@ function hexOf(value) {
   return value.toString(16).toUpperCase()
 }
 
-function worldSummary(world) {
+function worldStats(world) {
+  console.log(`worldStats ${world.code}`)
   const loc = `${String(world.x).padStart(2,'0')}${String(world.y).padStart(2,'0')}`
-  const code = `${world.starportType}${hexOf(world.size)}${hexOf(world.atmosphere)}${hexOf(world.hydroPercent)}` 
-    + `${hexOf(world.popLevel)}${hexOf(world.government)}${world.lawLevel} ${hexOf(world.techLevel)} ${world.bases}`
+  const code = `${world.port}${hexOf(world.size)}${hexOf(world.atmo)}${hexOf(world.hydro)}` 
+    + `${hexOf(world.pop)}${hexOf(world.gov)}${hexOf(world.law)} ${hexOf(world.tech)} ${world.bases}`
   return {loc: loc, code: code, name: world.name}
 }
 
@@ -143,7 +166,9 @@ function getFacilities(value) {
   })
   return [port, items]
 }
+
 function worldDetailsFromCode(worldCode) {
+  console.log('--- details from code')
   let code = worldCode.replaceAll(' ','')
   const [port, fac] = getFacilities(code.charAt(0))
   const det = `\n${planetSize(code.charAt(1))}, ${hydro(code.charAt(2))}`
@@ -158,42 +183,36 @@ function worldDetailsFromCode(worldCode) {
 }
 
 function worldDetails(world) {
-  const [port, fac] = getFacilities(world.starportType)
-  const summary = worldSummary(world)
+  console.log('--- details')
+  const [port, fac] = getFacilities(world.port)
+  const summary = worldStats(world)
   const st = `${summary.loc}  ${world.code}  ${world.name}`
-  + `\n${planetSize(world.size)}, ${hydro(world.hydroPercent)}`
-  + `\n${atmosphereTypes[world.atmosphere]} atmosphere`
-  + `\nPopulation ${world.population}`
+  + `\n${planetSize(world.size)}, ${hydro(world.hydro)}`
+  + `\n${atmosphereTypes[world.atmo]} atmosphere`
+  + `\nPopulation ${world.pop}`
   + `\n${port} starport:\n${fac.join('\n')}`
   + ('N2'.includes(world.bases) ? `\n  ${starportFeatures.nb}` : "")
   + ('S2'.includes(world.bases) ? `\n  ${starportFeatures.sb}${!fac.includes('rf') ? ", refined fuel available for scout ships" : ""}` : "")
-  + `\n${government(world.government)}\nTech Level: ${world.techLevel}\n${lawLevel(world.lawLevel)}\n`
+  + `\n${government(world.gov)}\nTech Level: ${world.tech}\n${lawLevel(world.law)}\n`
 
   return st
 }
 
-function getTechLevel(world) {
-  let dm = techMatrix.port[world.starportType] || 0
-    + techMatrix.size[world.sizeRoll] || 0
-    + techMatrix.atmo[world.atmosphere] || 0
-    + techMatrix.hydro[world.hydroPercent] || 0
-    + techMatrix.pop[world.population] || 0
-    + techMatrix.gov[world.government] || 0
-  return Math.max(0, roll(1) + dm)
-}
-
-function getBases(world) {
-  const codes = starportTypes[world.starportType].split(":")[1]?.split(";")[1]?.split(",") || []
+function getBases(port) {
+  const baseCodes = starportTypes[port].split(":")[1]?.split(";")[1]?.split(",") || []
   let nb = false
   let sb = false
-  for (let i=0; i< codes.length; i++) {
-    if (codes[i].startsWith('nb')) {
-      nb = (roll() >= codes[i].split('?')[1])
-    } else if (codes[i].startsWith('sb')) {
-      sb = (roll() >= codes[i].split('?')[1])
+  for (let i=0; i< baseCodes.length; i++) {
+    if (baseCodes[i].startsWith('nb')) {
+      nb = (roll() >= baseCodes[i].split('?')[1])
+    } else if (baseCodes[i].startsWith('sb')) {
+      sb = (roll() >= baseCodes[i].split('?')[1])
     }
   }
-  return (nb && sb) ? '2' : (nb) ? 'N' : (sb) ? 'S' : ' '
+  if (nb && sb) return '2'
+  else if (nb) return 'N'
+  else if (sb) return 'S' 
+  else return ' '
 }
 
 function newWorldName(subsector) {
@@ -212,26 +231,41 @@ function newWorldName(subsector) {
 function newHex(subsector, x, y, dm=0) {
   // roll for worlds in hex x,y with die modifier dm 
   if (roll(1) + dm < 4) return null
-  // world is present
+
+  // generate world
+  const port = starports.charAt(roll() - 2)
+  const size = roll() - 2
+  const atmo = (size == 0) ? 0 : Math.max(0, roll() - 7 + size)
+  const hydro = (size < 2) ? 0 : Math.max(0, roll() - 7 + size - ((atmo < 2 || atmo > 9) ? 4 : 0))
+  const pop = roll() - 2
+  const gov = Math.max(0, roll() - 7 + pop)
+  const law = Math.min(9, Math.max(0, roll() - 7 + gov))
+  const tech = Math.max(0, roll(1) 
+    + techMatrix.port[port] || 0
+    + techMatrix.size[size] || 0
+    + techMatrix.atmo[atmo] || 0
+    + techMatrix.hydro[hydro] || 0
+    + techMatrix.pop[pop] || 0
+    + techMatrix.gov[gov] || 0)
+  const bases = getBases(port)
 
   const world = {
     x: x,
     y: y,
     name: newWorldName(subsector),
-    starportType: starports.charAt(roll()-2),
-    size: roll()-2,
-    popLevel: roll()-2
+    port: port,
+    size: size,
+    atmo: atmo,
+    hydro: hydro,
+    pop: pop,
+    gov: gov,
+    law: law,
+    tech: tech,
+    bases: bases
   }
-//  world.navalBase = ('AB'.includes(world.starportType) && roll() >= 8) ? true : false
-//  world.scoutBase = ('ABCD'.includes(world.starportType) && roll() >= 10 - 'ABCD'.indexOf(world.starportType)) ? true : false
-  world.atmosphere = (world.size == 0) ? 0 : roll() + Math.max(0,world.size-7)
-  world.hydroPercent = (world.size <= 1) ? 0 : roll() + Math.min(10,Math.max(0,world.size-7))
-  world.population = exactPopulation(world.popLevel)
-  world.government = Math.max(0, roll() + world.popLevel-7)
-  world.lawLevel = Math.min(Math.max(0, roll() + world.government-7), 9)
-  world.techLevel = getTechLevel(world)
-  world.bases = getBases(world)
-  world.code = worldSummary(world).code
+  world.bases = getBases(port)
+  world.code = worldStats(world).code
+  console.dir (world)
 
   return world
 }
@@ -252,5 +286,4 @@ function newSubsector(dm=0) {
   return arr
 }
 
-
-module.exports = { newSubsector, newHex, worldSummary, worldDetails, worldDetailsFromCode, roll }
+module.exports = { newSubsector, newHex, worldStats, worldDetails, worldDetailsFromCode, roll }
